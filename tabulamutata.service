@@ -1,0 +1,9 @@
+[Unit]
+Description = Set up tablet when plugged in
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tabulamutata init
+
+[Install]
+WantedBy=graphical.target

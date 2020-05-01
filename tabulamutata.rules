@@ -1,0 +1,1 @@
+ACTION=="add", SUBSYSTEM=="hid", DRIVERS=="wacom", TAG+="systemd", ENV{SYSTEMD_WANTS}+="tabulamutata.service"

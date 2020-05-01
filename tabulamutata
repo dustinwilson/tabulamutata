@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+
+##? Configure the Wacom tablet
+##?
+##? Usage:
+##?   tabulamutata init
+##?   tabulamutata set-permissions
+##?   tabulamutata toggle-touch-wheel
+##?
+##? Options:
+##?   --help     Show this help
+
+help=$(grep "^##?" "$0" | cut -c 5-)
+eval "$(docopts -h "$help" : "$@")"
+shopt -s globstar
+
+tablet="Wacom Intuos4 12x19"
+usbid="056A:00BB"
+output="DisplayPort-1"
+
+# When run at boot the USB device might not be ready; sleep until it is.
+while [ ! -d /sys/bus/hid/devices/*$usbid* ]; do
+    sleep 0.5
+done
+
+led_folder=$(echo /sys/bus/hid/devices/*$usbid*/wacom_led/)
+
+# If the user is root then find the home folder of the user running the :0
+# display. Otherwise, the home folder is the home folder of the current running
+# user.
+if [ "$EUID" -eq 0 ]; then
+    # When this script fires upon boot it will start before a user has logged
+    # in, making the output of the `who` command be nothing. Keep trying until
+    # there is a user using the :0 display.
+    user=$(who | grep -m 1 ":0" | cut -d " " -f1)
+    while [ -z "$user" ]; do
+        sleep 0.5
+        user=$(who | grep -m 1 ":0" | cut -d " " -f1)
+    done
+
+    home=$(eval echo "~$user")
+
+    # If the logged-in user is an admin use the wheel group, otherwise users.
+    # Not necessary if the script user is not root. This is used to set
+    # permissions on the LED folder later.
+    group="users"
+    if [[ $(groups $user) == *"wheel"* ]]; then
+        group="wheel"
+    fi
+else
+    user=$(whoami)
+    home="$HOME"
+fi
+
+case $1 in
+init)
+    # Wait for the Xauthority file to exist.
+    while [ ! -f $home/.Xauthority ]; do
+        sleep 0.5
+    done
+
+    export XAUTHORITY=$home/.Xauthority
+    export DISPLAY=:0
+
+    # Run xbindkeys if it isn't running already
+    if [ -z "$(ps cax | grep xbindkeys)" ]; then
+        xbindkeys
+    fi
+
+    # This part of the script might fire before the wacom driver has accepted
+    # the device; sleep until it has.
+    while [ -z "$(xsetwacom --list devices)" ]; do
+        sleep 0.5
+    done
+
+    # If the user is root then set the permissions of the LED folder
+    if [ "$EUID" -eq 0 ]; then
+        chown -R :$group $led_folder
+    fi
+
+    # Map the tablet to only the first screen.
+    xsetwacom --set "$tablet Pen stylus" MapToOutput "$output"
+    xsetwacom --set "$tablet Pen eraser" MapToOutput "$output"
+    # Set the first button of the tablet (the one inside the touch ring) to the
+    # 42nd mouse button. It will in turn perform the "toggle-touch-wheel" action
+    # seen below using xbindkeys.
+    xsetwacom --set "$tablet Pad pad" Button 1 42
+
+    # Set the tablet's touch ring LED to the first position.
+    echo 0 > $led_folder/status_led0_select
+
+    # Continue on to toggling of the touch wheel
+    ;&
+
+toggle-touch-wheel)
+    # If the led cache doesn't exist then create its parent folder and set the
+    # status to 0
+    if [ -f $HOME/.local/share/tabulamutata/led_status ]; then
+        # Set the status to 1 more than the cached status. If it's more than 3 set
+        # it to 0 to reset.
+        status=$(expr $(cat $HOME/.local/share/tabulamutata/led_status) + 1)
+        if (( $status > 3 )); then
+            status=0
+        fi
+    else
+        mkdir -p $HOME/.local/share/tabulamutata
+        status=0
+    fi
+
+    # Write the new status to the LED so we make sure the numbers remain in the
+    # range of 0 to 3.
+    echo $status > $led_folder/status_led0_select
+
+    # My configuration has the touch wheel alternating between zooming with the
+    # mouse wheel and resizing the brush
+    case $status in
+    [0,2])
+        xsetwacom --set "$tablet Pad pad" AbsWheelUp 5
+        xsetwacom --set "$tablet Pad pad" AbsWheelDown 4
+        ;;
+    [1,3])
+        xsetwacom --set "$tablet Pad pad" AbsWheelUp "key ["
+        xsetwacom --set "$tablet Pad pad" AbsWheelDown "key ]"
+        ;;
+    esac
+
+    # Lastly write the status to the cache.
+    echo $status > $HOME/.local/share/tabulamutata/led_status
+    ;;
+
+set-permissions)
+    if [ "$EUID" -ne 0 ]; then
+        echo "The set-permissions subcommand must be run as root."
+        exit
+    fi
+
+    chown -R :$group $led_folder
+    ;;
+esac
