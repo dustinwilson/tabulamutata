@@ -26,9 +26,9 @@ Tabula Mutata is made up of 4 parts:
 2. Udev rule: `tabulamutata.rules`  
    `tabulamutata.rules` should be installed at `/etc/udev/rules.d/tabulamutata.rules`
 3. Systemd unit file: `tabulamutata.service`  
-   `tabulamutata.service` should be installed in `/etc/systemd/system/.xbindkeysrc`
+   `tabulamutata.service` should be installed at `/etc/systemd/system/.xbindkeysrc`
 4. Xbindkeys configuration file: `xbindkeysrc`  
-   `tabulamutata.service` should be installed in `~/.xbindkeysrc`
+   `xbindkeysrc` should be installed at `~/.xbindkeysrc`
 
 Following installation of the files enable and run the systemd unit file to get rolling:
 
@@ -39,7 +39,7 @@ systemctl start tabulamutata.service
 
 ## Documentation ##
 
-The executable has three subcommands:
+The executable (`tabulamutata`) has three subcommands:
 
 1. `init`  
    This is run by the systemd unit file and sets up the tablet.
@@ -47,3 +47,5 @@ The executable has three subcommands:
    This is a command meant to be run as root that sets the permissions of the LED folders. This usually shouldn't need to be run unless the tablet wasn't initialized properly.
 3. `toggle-touch-wheel`  
    This command is run by xbindkeys where it is bound to the button in the middle of the touch wheel, causing the configuration for the touch wheel to change
+
+The udev rule `tabulamutata.rules` is used to run the systemd unit file (`tabulamutata.service`) to configure the tablet when the tablet is plugged in or when the computer is booted up.
