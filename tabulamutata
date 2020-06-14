@@ -63,8 +63,8 @@ init)
     export DISPLAY=:0
 
     # Run xbindkeys if it isn't running already
-    if [ -z "$(ps cax | grep xbindkeys)" ]; then
-        xbindkeys
+    if [ -z "$(ps -u $user cax | grep xbindkeys)" ]; then
+        runuser -l $user -c "export XAUTHORITY=$XAUTHORITY; export DISPLAY=$DISPLAY; xbindkeys"
     fi
 
     # This part of the script might fire before the wacom driver has accepted
