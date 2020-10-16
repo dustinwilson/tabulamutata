@@ -78,6 +78,11 @@ init)
         chown -R :$group $led_folder
     fi
 
+    # Empty the tablet configuration from dconf so GNOME cannot interfere
+    if ! [ -z "$(which gnome-shell)" ] && ! [ -z "$(which dconf)" ]; then
+        runuser -l $user -c "dconf reset -f /org/gnome/desktop/peripherals/tablet/"
+    fi
+
     # Map the tablet to only the first screen.
     xsetwacom --set "$tablet Pen stylus" MapToOutput "$output"
     xsetwacom --set "$tablet Pen eraser" MapToOutput "$output"
