@@ -16,7 +16,9 @@ shopt -s globstar
 
 tablet="Wacom Intuos4 12x19"
 usbid="056A:00BB"
-output="DisplayPort-1"
+output=$(xrandr | egrep '\sconnected primary\s' | head -1 | awk '{print $1}')
+
+gnome=$(which gnome-shell 2>/dev/null)
 
 # When run at boot the USB device might not be ready; sleep until it is.
 while [ ! -d /sys/bus/hid/devices/*$usbid* ]; do
@@ -32,10 +34,16 @@ if [ "$EUID" -eq 0 ]; then
     # When this script fires upon boot it will start before a user has logged
     # in, making the output of the `who` command be nothing. Keep trying until
     # there is a user using the :0 display.
-    user=$(who | grep -m 1 ":0" | cut -d " " -f1)
+    if [ -n "$gnome" ]; then
+      display=:1
+    else
+      display=:0
+    fi
+
+    user=$(who | grep -m 1 "$display" | cut -d " " -f1)
     while [ -z "$user" ]; do
         sleep 0.5
-        user=$(who | grep -m 1 ":0" | cut -d " " -f1)
+        user=$(who | grep -m 1 "$display" | cut -d " " -f1)
     done
 
     home=$(eval echo "~$user")
@@ -54,13 +62,18 @@ fi
 
 case $1 in
 init)
+    if [ -n "$gnome" ]; then
+        export XAUTHORITY=/run/user/$(id -u $user)/gdm/Xauthority
+    else
+        export XAUTHORITY=$home/.Xauthority
+    fi
+
     # Wait for the Xauthority file to exist.
-    while [ ! -f $home/.Xauthority ]; do
+    while [ ! -f $XAUTHORITY ]; do
         sleep 0.5
     done
 
-    export XAUTHORITY=$home/.Xauthority
-    export DISPLAY=:0
+    export DISPLAY=$display
 
     # Run xbindkeys if it isn't running already
     if [ -z "$(ps -u $user cax | grep xbindkeys)" ]; then
@@ -79,17 +92,24 @@ init)
     fi
 
     # Empty the tablet configuration from dconf so GNOME cannot interfere
-    if ! [ -z "$(which gnome-shell)" ] && ! [ -z "$(which dconf)" ]; then
-        runuser -l $user -c "dconf reset -f /org/gnome/desktop/peripherals/tablet/"
-    fi
+    #if ! [ -z "$(which gnome-shell)" ] && ! [ -z "$(which dconf)" ]; then
+    #    runuser -l $user -c "export XAUTHORITY=$XAUTHORITY; export DISPLAY=$DISPLAY; dconf reset -f /org/gnome/desktop/peripherals/tablet/"
+    #fi
 
     # Map the tablet to only the first screen.
     xsetwacom --set "$tablet Pen stylus" MapToOutput "$output"
     xsetwacom --set "$tablet Pen eraser" MapToOutput "$output"
-    # Set the first button of the tablet (the one inside the touch ring) to the
-    # 42nd mouse button. It will in turn perform the "toggle-touch-wheel" action
-    # seen below using xbindkeys.
-    xsetwacom --set "$tablet Pad pad" Button 1 42
+
+    # GNOME doesn't register mouse keys here :/
+    # See https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/1724
+    if [ -n "$gnome" ]; then
+        xsetwacom --set "$tablet Pad pad" Button 1 "key shift alt super home"
+    else
+        # Set the first button of the tablet (the one inside the touch ring) to the
+        # 42nd mouse button. It will in turn perform the "toggle-touch-wheel" action
+        # seen below using xbindkeys.
+        xsetwacom --set "$tablet Pad pad" Button 1 42
+    fi
 
     # Set the tablet's touch ring LED to the first position.
     echo 0 > $led_folder/status_led0_select
@@ -120,8 +140,8 @@ toggle-touch-wheel)
     # mouse wheel and resizing the brush
     case $status in
     [0,2])
-        xsetwacom --set "$tablet Pad pad" AbsWheelUp 5
-        xsetwacom --set "$tablet Pad pad" AbsWheelDown 4
+        xsetwacom --set "$tablet Pad pad" AbsWheelUp "key ctrl minus"
+        xsetwacom --set "$tablet Pad pad" AbsWheelDown "key ctrl shift plus"
         ;;
     [1,3])
         xsetwacom --set "$tablet Pad pad" AbsWheelUp "key ["

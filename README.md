@@ -17,6 +17,7 @@ Tabula Mutata has the following dependencies:
 * docopts
 * systemd
 * xbindkeys
+* xdotool (only on GNOME)
 * X11
 
 Tabula Mutata is made up of 4 parts:
@@ -36,6 +37,10 @@ Following installation of the files enable and run the systemd unit file to get 
 systemctl enable tabulamutata.service
 systemctl start tabulamutata.service
 ```
+
+### GNOME ###
+
+GNOME is a bit different. GNOME is incapable of registering anything but left, middle, and right clicking on mice whenever X11 has buttons for many more (see https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/1724 for more information). This means that binding `tabulamutata toggle-touch-wheel` to button 42 isn't possible. The workaround is to instead use `xdotool`. In GNOME's keyboard shortcuts settings add a custom shortcut and bind `tabulamutata toggle-touch-wheel` to <kbd><kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>Super</kbd> + <kbd>Home</kbd></kbd>. Tabulamutata will automatically use this shortcut combination when using GNOME for toggling the touch wheel.
 
 ## Documentation ##
 
