@@ -33,18 +33,13 @@ led_folder=$(echo /sys/bus/hid/devices/*$usbid*/wacom_led/)
 if [ "$EUID" -eq 0 ]; then
     # When this script fires upon boot it will start before a user has logged
     # in, making the output of the `who` command be nothing. Keep trying until
-    # there is a user using the :0 display.
-    if [ -n "$gnome" ]; then
-      display=:1
-    else
-      display=:0
-    fi
-
-    user=$(who | grep -m 1 "$display" | cut -d " " -f1)
+    # there is a user using a display.
+    user=$(who | head -1 | cut -d " " -f1)
     while [ -z "$user" ]; do
         sleep 0.5
-        user=$(who | grep -m 1 "$display" | cut -d " " -f1)
+        user=$(who | head -1 | cut -d " " -f1)
     done
+    display=$(who | grep -1 "$user" | awk '{ print $2 }')
 
     home=$(eval echo "~$user")
 
